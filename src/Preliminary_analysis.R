@@ -3,13 +3,14 @@ library(sf)
 library(scales)
 library(colorspace)
 library(cowplot)
-library(pracma)
 library(mgcv)
-library(EMD)
 library(tidymv)
+library(ggrepel)
 source("R/functions.R")
 theme_set(theme_bw())
 
+
+# Loading the datasets ----------------------------------------------------
 
 map_dpt <- read_sf("data/departamentos/DEPARTAMENTOS.shp") %>% 
   rename(dpt_cdc = DEPARTAMEN)
@@ -62,63 +63,112 @@ death_count_dpt %>%
   facet_wrap(. ~ dpt_cdc) +
   ylab("Deaths per 1 million") + xlab("Date")
 
+# GAM models --------------------------------------------------------------
 
-# Identifying time of peaks of infection ----------------------------------
-# WORK WITH GAM 
-# Better peak finder
-  get_peaks(death_count_ntl$n)
-  
-  map(death_count_dpt_list,.f = ~get_peaks(.$n))
-  
-  first_peak <- map(death_count_dpt_list,.f = ~get_peaks_first(.$n)) %>% 
-    map2_dfr(death_count_dpt_list, .f = ~.y$fecha_fallecimiento[.x]) 
-  
-  first_peak <- tibble(dpt_cdc = names(first_peak), peak = t(first_peak))
+# Setting national GAM model
+mod_lm <- gam(n ~ s(day, k = 20), data = death_count_ntl)
+peak_ntl <- death_count_ntl$day[which(get_peak(mod_lm$fitted.values))]
+labels <- tibble(
+  x = peak_ntl,
+  y = mod_lm$fitted.values[peak_ntl],
+  label = as.character(death_count_ntl$fecha_fallecimiento[peak_ntl])
+)
+
+# Plotting national GAM model
+ggplot(aes(x = day, y = n), data = death_count_ntl) +
+  geom_covid_gam(
+    k = 20,
+    label_df = labels,
+    title = "National COVID-19 related deaths",
+    nudge_y = 150,
+    x = "Days",
+    y = "Number of deaths per day"
+    )
+
+# Setting departmental GAM models
+mod_list <- death_count_dpt_list %>% 
+  map(~gam(mort ~ s(day, k = 40), data = .))
+
+# Creating a peak list of data frames per department 
+peak_list <- mod_list %>% 
+  map2(
+    death_count_dpt_list,
+    ~tibble(
+      x = .y$day[which(get_peak(.x$fitted.values))],
+      index = which(get_peak(.x$fitted.values))
+      )
+    ) %>% 
+  map2(
+    mod_list,
+    ~ .x %>% 
+      mutate(
+        y = .y$fitted.values[.x$index]
+      )
+  ) %>%
+  map2(
+    death_count_dpt_list,
+    ~ .x %>% 
+      mutate(
+        label = as.character(.y$fecha_fallecimiento[.$y])
+      )
+  )
+
+for (i in 1:25) {
+  g <- ggplot(aes(x = day, y = mort), data = death_count_dpt_list[[i]]) +
+    geom_covid_gam(
+      k = 40,
+      x = "Days",
+      y = "Number of deaths per day",
+      title = death_count_dpt_list[[i]][1,2],
+      label_df = peak_list[[i]],
+      nudge_y = 10
+    )
+  ggsave(
+    paste0("plots/Plot_",i,"_", death_count_dpt_list[[i]][1,2],".png"), 
+    scale = 1.5,
+    g)
+}
 
 # Mapping deaths per department -------------------------------------------
 
-death_count_dpt %>% 
-  group_by(dpt_cdc) %>% 
-  summarise(n = sum(n) / max(pob)) %>% 
-  left_join()
+# Create first and number of peaks data frame from peak list
+dpt_peaks <- names(peak_list) %>% 
+  map2(
+    peak_list,
+    ~ tibble(
+      dpt_cdc = .x,
+      first_peak = min(.y$x),
+      n_peaks = nrow(.y)
+    )
+  ) %>% 
+  bind_rows()
+
+dpt_peaks %>% 
+  left_join(map_dpt) %>% 
   ggplot() +
-  geom_sf(aes(fill = mort, geometry = geometry), size = 0.01, color = "grey40") +
+  geom_sf(
+    aes(fill = first_peak, geometry = geometry), 
+    size = 0.05, color = "grey40"
+    ) +
   scale_fill_continuous_sequential(
     palette = "BurgYl",
-    name = "Mortalidad"
+    name = "Time to peak"
+  )
+
+dpt_peaks %>% 
+  left_join(map_dpt) %>% 
+  ggplot() +
+  geom_sf(
+    aes(fill = n_peaks, geometry = geometry), 
+    size = 0.05, color = "grey40"
+  ) +
+  scale_fill_continuous_sequential(
+    palette = "BurgYl",
+    name = "Number of peaks"
   )
 
 
-# Gam models --------------------------------------------------------------
-
-mod_lm <- gam(n ~ s(day, k = 20), data = death_count_ntl)
-peak_ntl <- death_count_ntl$day[which(get_peak(mod_lm$fitted.values))]
-
-ggplot(aes(x = day, y = n), data = death_count_ntl) +
-  geom_smooth(method = "gam", formula = y ~ s(x, k = 20)) +
-  geom_vline(xintercept = peak_ntl)
-
-mod_list <- death_count_dpt_list %>% 
-  map(
-    ~gam(n ~ s(day, k = 20), data = .)
-  )
-
-peak_list <- mod_list %>% 
-  map(
-    ~death_count_ntl$day[which(get_peak(.$fitted.values))]
-  )
-
-death_count_dpt %>% 
-  bind_rows() %>% 
-  ggplot(aes(x = day, y = mort)) +
-  geom_point(size = 0.1, alpha = 0.1) +
-  geom_smooth(method = "gam", formula = y ~ s(x, k = 20)) +
-  facet_wrap(. ~ dpt_cdc, ncol = 5)
-
-  
-
-
-# steps better peak estimators
+# steps better peak estimators OK
 # Number of peaks
 # Initial ramp up (ways, common trick)
 #  if population is well mixed identify firs#
