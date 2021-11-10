@@ -54,16 +54,3 @@ geom_covid_gam <- function(k, title, label_df, nudge_y, ...) {
     labs(title = title, ...)
   )
 }
-
-
-
-ggplot(aes(x = day, y = n), data = death_count_ntl) +
-  geom_line(alpha = 0.5) +
-  geom_smooth(method = "gam", formula = y ~ s(x, k = 20)) +
-  geom_label_repel(
-    aes(x = x, y = y, label = label),
-    nudge_y = 150,
-    data = labels,
-    arrow = arrow(length = unit(0.015, "npc")) 
-  ) +
-  labs(title = "National Estimates")
