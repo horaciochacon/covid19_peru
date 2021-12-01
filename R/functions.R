@@ -44,7 +44,8 @@ geom_gam_dates <- function() {
 geom_covid_gam <- function(k, title, label_df, nudge_y, ...) {
   list(
     geom_line(alpha = 0.5),
-    geom_smooth(method = "gam", formula = y ~ s(x, k = k)),
+    geom_smooth(method = "gam", formula = y ~ s(x, k = k),
+                method.args = list(family = "quasipoisson")),
     geom_label_repel(
       aes(x = x, y = y, label = label),
       nudge_y = nudge_y,

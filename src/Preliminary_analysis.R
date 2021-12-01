@@ -87,7 +87,7 @@ ggplot(aes(x = day, y = n), data = death_count_ntl) +
 
 # Setting departmental GAM models
 mod_list <- death_count_dpt_list %>% 
-  map(~gam(mort ~ s(day, k = 40), data = .))
+  map(~gam(mort ~ s(day, k = 20), family = quasipoisson(), data = .))
 
 # Creating a peak list of data frames per department 
 peak_list <- mod_list %>% 
@@ -116,17 +116,18 @@ peak_list <- mod_list %>%
 for (i in 1:25) {
   g <- ggplot(aes(x = day, y = mort), data = death_count_dpt_list[[i]]) +
     geom_covid_gam(
-      k = 40,
+      k = 20,
       x = "Days",
-      y = "Number of deaths per day",
+      y = "Number of deaths per 100k per day",
       title = death_count_dpt_list[[i]][1,2],
       label_df = peak_list[[i]],
       nudge_y = 10
     )
-  ggsave(
-    paste0("plots/Plot_",i,"_", death_count_dpt_list[[i]][1,2],".png"), 
-    scale = 1.5,
-    g)
+  print(g)
+  # ggsave(
+  #   paste0("plots/Plot_",i,"_", death_count_dpt_list[[i]][1,2],".png"), 
+  #   scale = 1.5,
+  #   g)
 }
 
 # Mapping deaths per department -------------------------------------------
@@ -147,11 +148,11 @@ dpt_peaks %>%
   left_join(map_dpt) %>% 
   ggplot() +
   geom_sf(
-    aes(fill = first_peak, geometry = geometry), 
+    aes(fill = first_peak - min(first_peak), geometry = geometry), 
     size = 0.05, color = "grey40"
     ) +
-  scale_fill_continuous_sequential(
-    palette = "BurgYl",
+  scale_fill_continuous_diverging(
+    palette = "Berlin",
     name = "Time to peak"
   )
 
@@ -182,3 +183,38 @@ dpt_peaks %>%
   #
   #
   #
+
+# Questions:
+# Why is there a different in timing of the peaks,
+# Do timing have to do with severity of the peaks
+# Possible drivers: more chance of preparing? more peaks, more importation?
+#   Multiple endemic waves simultanously
+#   Hierarchical model, cascadend spline approach, best way of doing it
+#   If using only gams, 
+#   approach: bayesian where  using the prior to generate "fake data"
+#   Use province level data give weight of 1, then department a bigger weight, but close
+#   every. 
+#   input data frame, deaths, week and weight.
+# Then put the fitting outputs into SEIR models. get Rt, and different parameters,
+# Better R packages.
+
+# data[which(data$location == province x),]
+# data[which(data$location == department y),]
+# data[which(data$location == department y),]
+# df <- data.frame(date = tmpdata$date, death_rate = tmpdata$death_rate, weight = 1)
+# tmpdata <- data[which(data$location == department y),]
+# df_2 = data.frame(date = tmpdata$date, death_rate = tmpdata$death_rate, weight = x)
+# df_mod <- rbind(df, df_2)
+# gam(death_rate ~ date, weght = )
+# gam(y~x, weights = weights, data=data)
+# 
+# Scatterplot first peak, against tot death per capita over first year.
+# Map at the province level
+
+
+
+
+
+
+
+

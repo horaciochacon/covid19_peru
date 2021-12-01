@@ -34,13 +34,21 @@ covid_deaths <- covid_deaths %>%
 
 
 # Creates death count data frame ------------------------------------------
-
+# Department
 death_count_day <- covid_deaths %>% 
   group_by(fecha_fallecimiento, sexo, agrp, dpt_cdc) %>% 
   count()
 
 write_excel_csv(death_count_day, "data/death_count_day.csv")
 
+# Province
+death_count_prov_day <- covid_deaths %>% 
+  group_by(fecha_fallecimiento, sexo, agrp, dpt_cdc, prov_cdc) %>% 
+  count()
+
+write_excel_csv(death_count_prov_day, "data/death_count_prov_day.csv")
+
+# Department
 death_count_week <- death_count_day %>%
   mutate(
     deaths_7d = rollmean(n, 7)
@@ -51,6 +59,20 @@ death_count_week <- death_count_day %>%
   count()
 
 write_excel_csv(death_count_week, "data/death_count_week.csv")
+
+# Province
+
+death_count_prov_week <- death_count_prov_day %>%
+  mutate(
+    deaths_7d = rollmean(n, 7)
+  ) %>%
+  group_by(
+    year_week = floor_date(fecha_fallecimiento, "1 week"), sexo, agrp,
+    dpt_cdc, prov_cdc
+  ) %>% 
+  count()
+
+write_excel_csv(death_count_prov_week, "data/death_count_prov_week.csv")
 
 # Plot results ------------------------------------------------------------
 
