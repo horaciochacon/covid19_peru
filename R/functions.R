@@ -30,6 +30,19 @@ get_peak <- function(x) {
   peak
 }
 
+get_peak_province <- function(x) {
+  peak <- vector()
+  for (i in 2:length(x)) {
+    if (x[i] > 50) {
+      peak[i] <- x[i] > x[i-1]  & x[i] >= x[i+1] &
+        x[i] > x[i-2]  & x[i] >= x[i+2]
+    } else{
+      peak[i] <- NA
+    }
+  }
+  peak
+}
+
 # Plotting functions ------------------------------------------------------
 
 geom_gam_dates <- function() {
